@@ -1,0 +1,181 @@
+# Create namespace  | kubectl create namespace avillalonga
+# Set namespace     | kubectl config set-context --current --namespace=avillalonga
+
+# ----------------------------------------------------------------
+# ----------------------------------------------------------------
+# ----------------------------------------------------------------
+# P O S T G R E S
+# ----------------------------------------------------------------
+# ----------------------------------------------------------------
+# ----------------------------------------------------------------
+
+---
+# POSTGRES DEPLOYMENT
+# --------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-postgres
+spec:
+  selector:
+    matchLabels:
+      app: deployment-postgres
+  template:
+    metadata:
+      labels:
+        app: deployment-postgres
+    spec:
+      volumes:
+          - name: data
+            persistentVolumeClaim:
+              claimName: postgres-pv-claim
+      containers:
+      - name: deployment-postgres
+        image: postgres
+        volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: data
+              subPath: data
+        ports:
+        - containerPort: 5432
+        env:
+          - name: "POSTGRES_PASSWORD"
+            value: superpassword
+          - name: "POSTGRES_USER"
+            value: superman
+          - name: "POSTGRES_DB"
+            value: supernextcloud
+          - name: "PGDATA"
+            value: /var/lib/postgresql/data
+---
+# POSTGRES SERVICE
+# --------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-postgres
+spec:
+  selector:
+    app: deployment-postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+---
+# POSTGRES PERSISTENT CLAIM
+# --------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pv-claim
+spec:
+  resources:
+    requests:
+      storage: 100M
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+
+# ----------------------------------------------------------------
+# ----------------------------------------------------------------
+# ----------------------------------------------------------------
+# N E X T   C L O U D
+# ----------------------------------------------------------------
+# ----------------------------------------------------------------
+# ----------------------------------------------------------------
+
+---
+# NEXTCLOUD DEPLOYMENT
+# --------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deployment-nextcloud
+  labels:
+    app: nextcloud
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: deployment-nextcloud
+  template:
+    metadata:
+      labels:
+        app: deployment-nextcloud
+    spec:
+      volumes:
+        - name: nxpv
+          persistentVolumeClaim:
+            claimName: nextcloud-pv-claim
+      containers:
+      - name: deployment-nextcloud
+        image: nextcloud
+        volumeMounts:
+            - mountPath: /var/www/html
+              name: nxpv
+              subPath: nxpv
+        ports:
+        - containerPort: 80
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "1"
+        env:
+          - name: "NEXTCLOUD_TRUSTED_DOMAINS"
+            value: "*"
+          - name: "POSTGRES_USER"
+            value: superman
+          - name: "POSTGRES_PASSWORD"
+            value: superpassword
+          - name: "POSTGRES_DB"
+            value: "supernextcloud"
+          - name: "POSTGRES_HOST"
+            value: service-postgres
+---
+# NEXTCLOUD PERSISTENT CLAIM
+# --------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nextcloud-pv-claim
+spec:
+  resources:
+    requests:
+      storage: 256M
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+---
+# NEXTCLOUD SERVICE
+# --------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-nextcloud
+spec:
+  selector:
+    app: deployment-nextcloud
+  ports:
+  - port: 8888
+    targetPort: 80
+---
+# NEXTCLOUD INGRESS (Reverse Proxy)
+# --------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-nextcloud
+  labels:
+    name: ingress-nextcloud
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: adrien.intech.insee.io
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: service-nextcloud
+            port: 
+              number: 8888

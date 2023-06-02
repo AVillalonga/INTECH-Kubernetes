@@ -1,0 +1,14 @@
+FROM node:18
+
+WORKDIR /usr/src/app
+
+COPY index.js ./
+COPY package*.json ./
+
+RUN npm install
+
+EXPOSE 9987
+CMD [ "npm", "run", "start" ]
+
+# sudo docker build . -t avillalonga/sample-express:0.0.4 
+# sudo docker run -p 9987:9987 avillalonga/sample-express:0.0.4
